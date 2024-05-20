@@ -1,0 +1,189 @@
+"""
+    File: street.py
+    Author: Yaolei Bian
+    Purpose: This program reads in user input and recursively print
+    an image of the street that based on the user input.
+"""
+
+def process_street(items, street, height):
+    ''' this function 
+        takes in a list of items, the current state of the street and the height of the street
+        and returns a modified street based on the items 
+    '''
+    if not items:
+        return street
+
+    item = items[-1]  # get the last item
+    item_type, rest = item.split(":",maxsplit=1)
+    #  check what item type is
+    if item_type == "b":
+        width, h, brick = rest.split(",")
+        width, h = int(width), int(h)
+        if len(street) < h:
+            street = [" " * len(street[0])] * (h - len(street)) + street
+        # modify the rows in the street where the brick will be added
+        street[:h] = list(map(lambda x: brick * width + x, street[:h]))
+
+        updated_street = process_street(items[:-1], street, max(height, h))
+        return updated_street
+    elif item_type == "p":
+        width, foliage = int(rest.split(",")[0]), rest.split(",")[1]
+        foliage_width = len(foliage)
+        left_spaces = (width - foliage_width) // 2
+        right_spaces = (width - foliage_width + 1) // 2
+        #  create a tree with the given foliage and width
+        tree = [
+            " " * left_spaces + foliage + " " * right_spaces,
+            " " * (left_spaces-1) + foliage * 3 + " " * (right_spaces-1),
+            " " * (left_spaces-2) + foliage * 5 + " " * (right_spaces-2),
+            " " * ((width - 1) // 2) + "|" + " " * ((width - 1) // 2),
+            " " * ((width - 1) // 2) + "|" + " " * ((width - 1) // 2)
+        ]
+        # add the tree to the street and adjust the height if necessary
+        updated_street = tree + street[:-5]
+        if len(updated_street) < height:
+            updated_street = [" " * len(street[0])] * (height - len(updated_street)) + updated_street
+        return process_street(items[:-1], updated_street, max(height, len(tree)))
+    elif item_type == "e":
+        width, trash = int(rest.split(",")[0]), rest.split(",")[1]
+        trash = trash.replace("_", " ")
+        trash = (trash * ((width + len(trash) - 1) // len(trash)))[:width]
+        #  add the trash to the last row of the street
+        street[-1] += trash
+        updated_street = street
+        if len(updated_street) < height:
+            updated_street = [" " * len(street[0])] * (height - len(updated_street)) + updated_street
+        return process_street(items[:-1], updated_street, max(height, 1))
+
+
+def render_street(street_spec):
+    ''' this function 
+        takes in a street specification string and returns the rendered street 
+    '''
+    #  Split the street specification 
+    #  string into a list of individual items
+    items = street_spec.split()  
+    height = 1  #  Set the height of the street to 1
+    street = [""]   #  Initialize with an empty row
+    street = process_street(items, street, height)  
+    #  Add an empty row to the top of the street to create a margin
+    street = [" " * len(street[0])] + street  
+    return street
+
+
+def combine_streets(street_specs):
+    ''' this function 
+        takes a list of street specifications 
+        and combines them into a single rendered street 
+    '''
+    streets = render_streets(street_specs, [], 0) 
+    #  Determine the maximum height of the rendered streets
+    max_height = get_max_height(streets, 0, len(streets), 0)  
+    rendered_streets = []  # Create an empty list to hold the rows
+    #  Combine the rows of the rendered streets into a single list of rows
+    combined = combine_rows(streets, -1, max_height, rendered_streets)  
+    border = get_border(combined[0]) 
+    return add_borders(combined, border)  
+
+
+def render_streets(street_specs, streets, index):
+    ''' this function 
+        renders each street in the street 
+        specification list and appends the result to the streets list 
+    '''
+    #  If the end of the street specification list has been reached
+    if index == len(street_specs):  
+        return streets
+    #  Render the street at the current index of the street list
+    street = render_street(street_specs[index])  
+    streets.append(street)
+    return render_streets(street_specs, streets, index + 1)  
+
+
+def get_max_height(streets, index, length, max_height):
+    ''' this function 
+        calculates the maximum height of the rendered streets 
+    '''
+    if index == length:  # If the end of the streets list has been reached
+        return max_height
+    street = streets[index]  
+    height = len(street)  
+    #  If the current height is greater than the current 
+    #  maximum height, update the maximum height
+    if height > max_height:  
+        max_height = height
+    return get_max_height(streets, index + 1, length, max_height) 
+
+def combine_rows(streets, row_index, max_height, rendered_streets):
+    ''' Combine rows into a rendered street.
+    '''
+    # combing rows into a rendered street
+    # running from bottom up, so the start row_index is -1
+
+    # check if we ran out of row
+    if abs(row_index) > max_height:
+        return rendered_streets
+
+    # making the row
+    row = get_row(streets, row_index, 0, '')
+    rendered_streets.insert(0, row)
+    return combine_rows(streets, row_index - 1, max_height, rendered_streets)
+
+
+def get_row(streets, row_index, column_index, rendered_row):
+    ''' this function creates a row, starting from the first column.
+    '''
+    # creating the row, starting from the first column
+    if column_index == len(streets):
+        return rendered_row
+    column = streets[column_index]
+    if abs(row_index) > len(column):
+        # if the row is higher than the length of the column, we add blank spaces
+        # equal to the length of the row
+        rendered_row += ' ' * len(column[0])
+    else:
+        rendered_row += column[row_index]
+    return get_row(streets, row_index, column_index + 1, rendered_row)
+
+
+
+def get_border(row):
+    ''' this function gets the border
+    '''
+    return "+" + "-" * len(row) + "+"
+
+def add_borders(street, border, row_acc=None):
+    ''' this function creates borders for rows
+    '''
+    if row_acc is None:
+        row_acc = []
+
+    if not street:
+        return [border] + row_acc + [border]
+
+    first_row, *rest_rows = street
+    #  formats the first row with borders by 
+    #  adding | to the beginning and end of the row, and filling the row with - 
+    updated_row = "|{:{}s}|".format(first_row, len(border)-2)
+    return add_borders(rest_rows, border, row_acc + [updated_row])
+
+
+
+
+
+def main():
+    ''' the function gets user input'''
+    street_spec = input("Street: ")
+    street_specs = street_spec.split() 
+    if len(street_specs) == 1:
+        street = render_street(street_specs[0])
+        border = "+" + "-" * len(street[0]) + "+"
+        street = add_borders(street, border)
+        print("\n".join(street))
+    #  in case of multiple
+    else:
+        result = combine_streets(street_specs)
+        print("\n".join(result))
+
+
+main()
